@@ -211,7 +211,7 @@ module PrototypeHelper
   #   <% form_remote_tag :url => '/posts' do -%>
   #     <div><%= submit_tag 'Save' %></div>
   #   <% end -%>
-  def form_remote_tag(options = {}, &block)
+  def form_remote_tag(options = {}, *parameters_for_url, &block)
     options[:form] = true
 
     options[:html] ||= {}
@@ -219,7 +219,7 @@ module PrototypeHelper
       (options[:html][:onsubmit] ? options[:html][:onsubmit] + "; " : "") +
       "#{remote_function(options)}; return false;"
 
-    form_tag(options[:html].delete(:action) || url_for(options[:url]), options[:html], &block)
+    form_tag(options, &block)
   end
 
   # Creates a form that will submit using XMLHttpRequest in the background
@@ -257,8 +257,11 @@ module PrototypeHelper
   #
   # See FormHelper#form_for for additional semantics.
   def remote_form_for(record_or_name_or_array, *args, &proc)
+    
+    raise ArgumentError, "Missing block" unless block_given?
+ 
     options = args.extract_options!
-
+ 
     case record_or_name_or_array
     when String, Symbol
       object_name = record_or_name_or_array
@@ -268,15 +271,17 @@ module PrototypeHelper
       apply_form_for_options!(record_or_name_or_array, options)
       args.unshift object
     else
-      object      = record_or_name_or_array
-      object_name = ActionController::RecordIdentifier.singular_class_name(record_or_name_or_array)
-      apply_form_for_options!(object, options)
+      object = record_or_name_or_array
+      object_name = ActionController::RecordIdentifier.singular_class_name(object)
+      apply_form_for_options!([object], options)
       args.unshift object
     end
-
-    concat(form_remote_tag(options))
-    fields_for(object_name, *(args << options), &proc)
-    concat('</form>'.html_safe)
+ 
+    options[:html][:remote] = true if options.delete(:remote)
+ 
+    output = form_remote_tag(options)
+    output << fields_for(object_name, *(args << options), &proc)
+    output.safe_concat('</form>')
   end
   alias_method :form_remote_for, :remote_form_for
 
